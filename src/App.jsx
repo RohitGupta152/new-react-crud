@@ -21,7 +21,7 @@ function AppContent() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const API_URL = 'http://localhost:5000/api/users';
+  const API_URL = 'https://new-crud-tau.vercel.app/api/users';
   const [showDeleteAllConfirmation, setShowDeleteAllConfirmation] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
