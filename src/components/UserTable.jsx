@@ -44,7 +44,7 @@ const UserTable = ({ users, onEdit, onDelete }) => {
       formData.append('file', file);
 
       try {
-        const response = await fetch('http://localhost:5000/api/users/import', {
+        const response = await fetch('https://new-crud-tau.vercel.app/api/users/import', {
           method: 'POST',
           body: formData,
         });
