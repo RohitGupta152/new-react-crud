@@ -1,56 +1,61 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import PropTypes from 'prop-types';
 
-const ThemeContext = createContext();
+const STORAGE_KEY = 'theme';
+const VALID_THEMES = ['light', 'dark', 'aurora'];
+
+const ThemeContext = createContext(undefined);
+
+function getInitialTheme() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (VALID_THEMES.includes(saved)) return saved;
+  } catch {
+    // localStorage unavailable
+  }
+  return 'light';
+}
 
 export function ThemeProvider({ children }) {
-  // Initialize state from localStorage or system preference
-  const [darkMode, setDarkMode] = useState(() => {
-    // First check localStorage
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme !== null) {
-      return savedTheme === 'dark';
-    }
-    // If no saved preference, check system preference
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
-  });
+  const [theme, setTheme] = useState(getInitialTheme);
 
-  // Update localStorage and document class when theme changes
   useEffect(() => {
-    // Save to localStorage
-    localStorage.setItem('theme', darkMode ? 'dark' : 'light');
-    
-    // Update document class for Tailwind
-    if (darkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
+    const root = document.documentElement;
+    root.setAttribute('data-theme', theme);
+    root.classList.toggle('dark', theme === 'dark' || theme === 'aurora');
+    try {
+      localStorage.setItem(STORAGE_KEY, theme);
+    } catch {
+      // localStorage unavailable
     }
-  }, [darkMode]);
+  }, [theme]);
 
-  // Listen for system theme changes
-  useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = (e) => {
-      // Only update if there's no localStorage preference
-      if (!localStorage.getItem('theme')) {
-        setDarkMode(e.matches);
-      }
-    };
-
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
+  const setMode = useCallback((next) => {
+    setTheme(VALID_THEMES.includes(next) ? next : 'light');
   }, []);
 
-  const toggleDarkMode = () => {
-    setDarkMode(prev => !prev);
+  const cycleTheme = useCallback(() => {
+    setTheme((prev) => {
+      const idx = VALID_THEMES.indexOf(prev);
+      return VALID_THEMES[(idx + 1) % VALID_THEMES.length];
+    });
+  }, []);
+
+  const value = {
+    theme,
+    setTheme: setMode,
+    cycleTheme,
+    isLight: theme === 'light',
+    isDark: theme === 'dark',
+    isAurora: theme === 'aurora',
   };
 
-  return (
-    <ThemeContext.Provider value={{ darkMode, toggleDarkMode }}>
-      {children}
-    </ThemeContext.Provider>
-  );
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
+
+ThemeProvider.propTypes = {
+  children: PropTypes.node.isRequired,
+};
 
 export function useTheme() {
   const context = useContext(ThemeContext);
@@ -58,4 +63,4 @@ export function useTheme() {
     throw new Error('useTheme must be used within a ThemeProvider');
   }
   return context;
-} 
+}

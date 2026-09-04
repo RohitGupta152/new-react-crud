@@ -1,74 +1,59 @@
-import React, { useEffect, useState } from 'react';
+import PropTypes from 'prop-types';
+import { useEffect, useState } from 'react';
+import { CheckCircleIcon } from '@heroicons/react/24/outline';
+import Modal from './Modal';
 
-const SuccessDialog = ({ isOpen, message, onClose, duration = 3000 }) => {
+function SuccessDialog({ isOpen, message, onClose, duration = 3000 }) {
   const [progress, setProgress] = useState(100);
 
   useEffect(() => {
-    if (isOpen) {
-      // Reset progress when dialog opens
-      setProgress(100);
-
-      // Start countdown
-      const startTime = Date.now();
-      const endTime = startTime + duration;
-
-      const timer = setInterval(() => {
-        const now = Date.now();
-        const remaining = endTime - now;
-        const newProgress = (remaining / duration) * 100;
-
-        if (remaining <= 0) {
-          clearInterval(timer);
-          onClose();
-        } else {
-          setProgress(Math.max(0, newProgress));
-        }
-      }, 16); // Smoother animation with 60fps
-
-      // Auto close after exact duration
-      const closeTimer = setTimeout(() => {
+    if (!isOpen) return undefined;
+    setProgress(100);
+    const start = Date.now();
+    const end = start + duration;
+    const timer = setInterval(() => {
+      const remaining = end - Date.now();
+      const p = Math.max(0, (remaining / duration) * 100);
+      setProgress(p);
+      if (p <= 0) {
         clearInterval(timer);
         onClose();
-      }, duration);
-
-      return () => {
-        clearInterval(timer);
-        clearTimeout(closeTimer);
-      };
-    }
+      }
+    }, 30);
+    const closeTimer = setTimeout(onClose, duration);
+    return () => {
+      clearInterval(timer);
+      clearTimeout(closeTimer);
+    };
   }, [isOpen, duration, onClose]);
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-sm mx-4 shadow-xl relative overflow-hidden">
-        {/* Progress bar */}
-        <div 
-          className="absolute bottom-0 left-0 h-1 bg-green-500 transition-all duration-[16ms] ease-linear"
-          style={{ width: `${progress}%` }}
-        />
-
-        <div className="flex items-center justify-center mb-4">
-          <div className="bg-green-100 dark:bg-green-900/50 rounded-full p-3">
-            <svg className="h-6 w-6 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
+    <Modal isOpen={isOpen} onClose={onClose} maxWidth="max-w-sm" titleId="success-title" className="overflow-hidden">
+      <div className="p-6 text-center">
+        <div className="mx-auto flex h-14 w-14 animate-pop items-center justify-center rounded-full bg-app-success-soft text-app-success">
+          <CheckCircleIcon className="h-8 w-8" />
         </div>
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white text-center mb-2">Success!</h3>
-        <p className="text-sm text-gray-500 dark:text-gray-400 text-center mb-4">{message}</p>
-        <div className="flex justify-center">
-          <button
-            onClick={onClose}
-            className="bg-green-600 dark:bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-700 dark:hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 dark:focus:ring-offset-gray-800 transition-colors duration-200"
-          >
-            Close
-          </button>
-        </div>
+        <h3 id="success-title" className="mt-4 text-lg font-bold text-app-text">
+          Success!
+        </h3>
+        <p className="mt-2 text-sm leading-relaxed text-app-text-2">{message}</p>
+        <button type="button" data-autofocus onClick={onClose} className="btn-primary mt-6 w-full px-4 py-2.5 text-sm">
+          Close
+        </button>
       </div>
-    </div>
+      <span
+        className="absolute bottom-0 left-0 h-1 rounded-full bg-app-success"
+        style={{ width: `${progress}%`, transition: 'width 30ms linear' }}
+      />
+    </Modal>
   );
+}
+
+SuccessDialog.propTypes = {
+  isOpen: PropTypes.bool.isRequired,
+  message: PropTypes.string.isRequired,
+  onClose: PropTypes.func.isRequired,
+  duration: PropTypes.number,
 };
 
-export default SuccessDialog; 
+export default SuccessDialog;

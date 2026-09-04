@@ -1,238 +1,242 @@
-import React, { useState } from 'react';
-import SuccessDialog from './SuccessDialog';
-import ErrorDialog from './ErrorDialog';
+import PropTypes from 'prop-types';
+import { useState } from 'react';
+import {
+  UserIcon,
+  EnvelopeIcon,
+  PhoneIcon,
+  XMarkIcon,
+} from '@heroicons/react/24/outline';
+import Modal from './Modal';
 
-const UserForm = ({ user, onSubmit, onCancel }) => {
+const formatName = (name) =>
+  name
+    .toLowerCase()
+    .split(' ')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+    .replace(/[^a-zA-Z\s]/g, '');
+
+const validateName = (name) => {
+  const nameRegex = /^[A-Z][a-z]+ [A-Z][a-z]+$/;
+  return nameRegex.test(name);
+};
+
+const validateMobile = (mobile) => /^\d{10}$/.test(mobile);
+
+function UserForm({ user, onSubmit, onCancel, onSuccess, onError }) {
   const [formData, setFormData] = useState({
     name: user?.name || '',
     email: user?.email || '',
-    mobile: user?.mobile || ''
+    mobile: user?.mobile || '',
   });
-
-  const [errors, setErrors] = useState({
-    name: false,
-    email: false,
-    mobile: false
-  });
-
-  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
-  const [showErrorDialog, setShowErrorDialog] = useState(false);
-  const [errorData, setErrorData] = useState(null);
-  const [successMessage, setSuccessMessage] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
-
-  // Function to format name (capitalize first letter of each word)
-  const formatName = (name) => {
-    return name
-      .toLowerCase()
-      .split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ')
-      .replace(/[^a-zA-Z\s]/g, ''); // Remove any non-letter characters except spaces
-  };
-
-  const validateName = (name) => {
-    // At least two words, only letters and spaces, each word capitalized
-    const nameRegex = /^[A-Z][a-z]+ [A-Z][a-z]+$/;
-    return nameRegex.test(name);
-  };
-
-  const validateMobile = (mobile) => {
-    const mobileRegex = /^\d{10}$/;
-    return mobileRegex.test(mobile);
-  };
+  const [errors, setErrors] = useState({ name: false, email: false, mobile: false });
+  const [submitting, setSubmitting] = useState(false);
 
   const handleNameChange = (e) => {
-    let formattedName = formatName(e.target.value);
+    const formattedName = formatName(e.target.value);
     setFormData({ ...formData, name: formattedName });
-    setErrors({ 
-      ...errors, 
-      name: formattedName.trim() === '' || !validateName(formattedName)
-    });
+    setErrors({ ...errors, name: formattedName.trim() === '' || !validateName(formattedName) });
   };
 
   const handleMobileChange = (e) => {
-    // Only allow numbers and limit to 10 digits
-    const formattedMobile = e.target.value
-      .replace(/[^\d]/g, '')  // Remove non-digits
-      .slice(0, 10);          // Limit to 10 digits
-
+    const formattedMobile = e.target.value.replace(/[^\d]/g, '').slice(0, 10);
     setFormData({ ...formData, mobile: formattedMobile });
-    setErrors({
-      ...errors,
-      mobile: formattedMobile.length !== 10
-    });
+    setErrors({ ...errors, mobile: formattedMobile.length !== 10 });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     const newErrors = {
       name: !formData.name.trim() || !validateName(formData.name),
       email: !formData.email.trim(),
-      mobile: !formData.mobile.trim() || !validateMobile(formData.mobile)
+      mobile: !formData.mobile.trim() || !validateMobile(formData.mobile),
     };
-
     setErrors(newErrors);
 
-    if (Object.values(newErrors).some(error => error)) {
-      return;
-    }
+    if (Object.values(newErrors).some((err) => err)) return;
 
+    setSubmitting(true);
     try {
       const result = await onSubmit(formData);
-      if (result.success) {
-        setSuccessMessage(user ? 'User updated successfully!' : 'User created successfully!');
-        setShowSuccessDialog(true);
+      if (result?.success) {
+        onSuccess(user ? 'User updated successfully!' : 'User created successfully!');
       }
     } catch (error) {
       console.error('Error submitting form:', error);
-      setErrorMessage(error.message || 'An error occurred');
-      setErrorData({
-        existingInDatabase: {
-          emails: error.email ? [{ value: formData.email, existingUser: { name: error.existingUser } }] : [],
-          mobiles: error.mobile ? [{ value: formData.mobile, existingUser: { name: error.existingUser } }] : []
-        }
+      onError({
+        message: error.message || 'An error occurred',
+        errorData: {
+          existingInDatabase: {
+            emails: error.email ? [{ value: formData.email, existingUser: { name: error.existingUser } }] : [],
+            mobiles: error.mobile ? [{ value: formData.mobile, existingUser: { name: error.existingUser } }] : [],
+          },
+        },
       });
-      setShowErrorDialog(true);
+    } finally {
+      setSubmitting(false);
     }
   };
 
+  const fieldClass = (invalid) =>
+    `input-field h-11 pl-11 pr-4 text-sm ${invalid ? 'invalid' : ''}`;
+
   return (
-    <>
-      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md">
-          <div className="p-6">
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">
+    <Modal
+      isOpen
+      onClose={onCancel}
+      maxWidth="max-w-md"
+      bottomSheet
+      titleId="user-form-title"
+    >
+      <div className="flex items-start justify-between gap-3 border-b border-app-border-2 px-6 py-5">
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 via-violet-500 to-fuchsia-500 text-white shadow-glow">
+            <UserIcon className="h-5 w-5" />
+          </span>
+          <div>
+            <h3 id="user-form-title" className="text-lg font-bold leading-tight text-app-text">
               {user ? 'Edit User' : 'Create New User'}
             </h3>
-            
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Name
-                  {errors.name && (
-                    <span className="text-red-600 dark:text-red-400 ml-1">*Format: First Last (e.g. John Doe)</span>
-                  )}
-                </label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={handleNameChange}
-                  className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-1 
-                    ${errors.name 
-                      ? 'border-red-500 focus:border-red-500 focus:ring-red-500 bg-red-50 dark:bg-red-900/20' 
-                      : 'border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white'
-                    }`}
-                  placeholder="Enter name"
-                />
-                {errors.name && (
-                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                    Please enter a valid name in the format: First Last
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Email
-                  {errors.email && (
-                    <span className="text-red-600 dark:text-red-400 ml-1">*Required</span>
-                  )}
-                </label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => {
-                    setFormData({ ...formData, email: e.target.value });
-                    setErrors({ ...errors, email: false });
-                  }}
-                  className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-1 
-                    ${errors.email 
-                      ? 'border-red-500 focus:border-red-500 focus:ring-red-500 bg-red-50 dark:bg-red-900/20' 
-                      : 'border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white'
-                    }`}
-                  placeholder="Enter email"
-                />
-                {errors.email && (
-                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">Please enter an email address</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Mobile
-                  {errors.mobile && (
-                    <span className="text-red-600 dark:text-red-400 ml-1">*Must be 10 digits</span>
-                  )}
-                </label>
-                <input
-                  type="tel"
-                  value={formData.mobile}
-                  onChange={handleMobileChange}
-                  className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-1 
-                    ${errors.mobile 
-                      ? 'border-red-500 focus:border-red-500 focus:ring-red-500 bg-red-50 dark:bg-red-900/20' 
-                      : 'border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white'
-                    }`}
-                  placeholder="Enter 10 digit mobile number"
-                  maxLength="10"
-                  pattern="\d{10}"
-                />
-                {errors.mobile && (
-                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                    {formData.mobile.length === 0 
-                      ? "Please enter a mobile number"
-                      : "Mobile number must be exactly 10 digits"
-                    }
-                  </p>
-                )}
-              </div>
-
-              <div className="flex justify-end space-x-3 mt-6">
-                <button
-                  type="button"
-                  onClick={onCancel}
-                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800"
-                >
-                  {user ? 'Update' : 'Create'}
-                </button>
-              </div>
-            </form>
+            <p className="text-xs text-app-text-3">
+              {user ? 'Update the details below' : 'Add a new member to your directory'}
+            </p>
           </div>
         </div>
+        <button type="button" onClick={onCancel} aria-label="Close" className="icon-btn shrink-0">
+          <XMarkIcon className="h-5 w-5" />
+        </button>
       </div>
 
-      <SuccessDialog
-        isOpen={showSuccessDialog}
-        message={successMessage}
-        duration={3000}
-        onClose={() => {
-          setShowSuccessDialog(false);
-          setSuccessMessage('');
-          onCancel();
-        }}
-      />
+      <form onSubmit={handleSubmit} className="space-y-5 px-6 py-6">
+        <div>
+          <label htmlFor="user-name" className="mb-1.5 block text-sm font-semibold text-app-text">
+            Full Name
+            <span className="ml-1 text-app-danger" aria-hidden="true">*</span>
+          </label>
+          <div className="relative">
+            <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-app-text-3">
+              <UserIcon className="h-5 w-5" />
+            </span>
+            <input
+              id="user-name"
+              type="text"
+              value={formData.name}
+              onChange={handleNameChange}
+              data-autofocus
+              aria-invalid={errors.name || undefined}
+              aria-describedby={errors.name ? 'user-name-error' : undefined}
+              placeholder="e.g. John Doe"
+              autoComplete="name"
+              className={fieldClass(errors.name)}
+            />
+          </div>
+          {errors.name && (
+            <p id="user-name-error" className="mt-1.5 text-xs font-medium text-app-danger">
+              Please enter a valid name in the format: First Last (letters only)
+            </p>
+          )}
+        </div>
 
-      <ErrorDialog
-        isOpen={showErrorDialog}
-        message={errorMessage}
-        errorData={errorData}
-        duration={10000}
-        onClose={() => {
-          setShowErrorDialog(false);
-          setErrorMessage('');
-          setErrorData(null);
-        }}
-      />
-    </>
+        <div>
+          <label htmlFor="user-email" className="mb-1.5 block text-sm font-semibold text-app-text">
+            Email Address
+            <span className="ml-1 text-app-danger" aria-hidden="true">*</span>
+          </label>
+          <div className="relative">
+            <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-app-text-3">
+              <EnvelopeIcon className="h-5 w-5" />
+            </span>
+            <input
+              id="user-email"
+              type="email"
+              value={formData.email}
+              onChange={(e) => {
+                setFormData({ ...formData, email: e.target.value });
+                setErrors({ ...errors, email: false });
+              }}
+              aria-invalid={errors.email || undefined}
+              aria-describedby={errors.email ? 'user-email-error' : undefined}
+              placeholder="name@company.com"
+              autoComplete="email"
+              className={fieldClass(errors.email)}
+            />
+          </div>
+          {errors.email && (
+            <p id="user-email-error" className="mt-1.5 text-xs font-medium text-app-danger">
+              Please enter an email address
+            </p>
+          )}
+        </div>
+
+        <div>
+          <label htmlFor="user-mobile" className="mb-1.5 block text-sm font-semibold text-app-text">
+            Mobile Number
+            <span className="ml-1 text-app-danger" aria-hidden="true">*</span>
+          </label>
+          <div className="relative">
+            <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-app-text-3">
+              <PhoneIcon className="h-5 w-5" />
+            </span>
+            <input
+              id="user-mobile"
+              type="tel"
+              value={formData.mobile}
+              onChange={handleMobileChange}
+              aria-invalid={errors.mobile || undefined}
+              aria-describedby={errors.mobile ? 'user-mobile-error' : undefined}
+              placeholder="10 digit mobile number"
+              maxLength="10"
+              pattern="\d{10}"
+              autoComplete="tel"
+              className={fieldClass(errors.mobile)}
+            />
+          </div>
+          {errors.mobile && (
+            <p id="user-mobile-error" className="mt-1.5 text-xs font-medium text-app-danger">
+              {formData.mobile.length === 0
+                ? 'Please enter a mobile number'
+                : 'Mobile number must be exactly 10 digits'}
+            </p>
+          )}
+        </div>
+
+        <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={submitting}
+            className="btn-secondary px-5 py-2.5 text-sm"
+          >
+            Cancel
+          </button>
+          <button type="submit" disabled={submitting} className="btn-primary flex-1 px-5 py-2.5 text-sm">
+            {submitting ? (
+              <>
+                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                </svg>
+                {user ? 'Updating…' : 'Creating…'}
+              </>
+            ) : user ? (
+              'Update User'
+            ) : (
+              'Create User'
+            )}
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
+}
+
+UserForm.propTypes = {
+  user: PropTypes.object,
+  onSubmit: PropTypes.func.isRequired,
+  onCancel: PropTypes.func.isRequired,
+  onSuccess: PropTypes.func.isRequired,
+  onError: PropTypes.func.isRequired,
 };
 
-export default UserForm; 
+export default UserForm;

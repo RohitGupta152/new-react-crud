@@ -7,40 +7,55 @@ export default {
   darkMode: 'class',
   theme: {
     extend: {
-      // ... other extensions
+      colors: {
+        app: {
+          bg: 'var(--bg)',
+          surface: 'var(--surface)',
+          'surface-2': 'var(--surface-2)',
+          'surface-3': 'var(--surface-3)',
+          raised: 'var(--raised)',
+          text: 'var(--text)',
+          'text-2': 'var(--text-2)',
+          'text-3': 'var(--text-3)',
+          border: 'var(--border)',
+          'border-2': 'var(--border-2)',
+          primary: 'var(--primary)',
+          'primary-2': 'var(--primary-2)',
+          'primary-3': 'var(--primary-3)',
+          'primary-soft': 'var(--primary-soft)',
+          'primary-softer': 'var(--primary-softer)',
+          success: 'var(--success)',
+          'success-soft': 'var(--success-soft)',
+          warning: 'var(--warning)',
+          'warning-soft': 'var(--warning-soft)',
+          danger: 'var(--danger)',
+          'danger-soft': 'var(--danger-soft)',
+          info: 'var(--info)',
+          'info-soft': 'var(--info-soft)',
+          overlay: 'var(--overlay)',
+        },
+      },
+      boxShadow: {
+        card: 'var(--card-shadow)',
+        'card-hover': 'var(--card-shadow-hover)',
+        glow: 'var(--glow)',
+        'glow-lg': 'var(--glow-lg)',
+        ring: 'var(--ring)',
+      },
+      fontFamily: {
+        sans: [
+          'Inter',
+          'ui-sans-serif',
+          'system-ui',
+          '-apple-system',
+          'Segoe UI',
+          'Roboto',
+          'Helvetica Neue',
+          'Arial',
+          'sans-serif',
+        ],
+      },
     },
   },
-  plugins: [
-    function({ addUtilities }) {
-      addUtilities({
-        '.custom-scrollbar': {
-          '&::-webkit-scrollbar': {
-            width: '4px',
-          },
-          '&::-webkit-scrollbar-track': {
-            backgroundColor: '#f1f1f1',
-          },
-          '&::-webkit-scrollbar-thumb': {
-            backgroundColor: '#888',
-            borderRadius: '2px',
-          },
-          '&::-webkit-scrollbar-thumb:hover': {
-            backgroundColor: '#555',
-          },
-        },
-        '.custom-scrollbar-dark': {
-          '&::-webkit-scrollbar-track': {
-            backgroundColor: '#374151',
-          },
-          '&::-webkit-scrollbar-thumb': {
-            backgroundColor: '#4B5563',
-          },
-          '&::-webkit-scrollbar-thumb:hover': {
-            backgroundColor: '#6B7280',
-          },
-        },
-      });
-    },
-  ],
-}
-
+  plugins: [],
+};

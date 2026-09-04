@@ -1,10 +1,37 @@
-import React, { useState, useRef } from 'react';
+import PropTypes from 'prop-types';
+import { useState, useRef } from 'react';
+import {
+  EnvelopeIcon,
+  PhoneIcon,
+  ArrowDownTrayIcon,
+  ArrowUpTrayIcon,
+  ArrowPathIcon,
+  UsersIcon,
+  MagnifyingGlassIcon,
+  CalendarDaysIcon,
+  UserPlusIcon,
+} from '@heroicons/react/24/outline';
+import { PencilIcon as PencilSolidIcon, TrashIcon as TrashSolidIcon } from '@heroicons/react/24/solid';
 import ConfirmationDialog from './ConfirmationDialog';
 import SuccessDialog from './SuccessDialog';
 import ErrorDialog from './ErrorDialog';
-import { useTheme } from '../context/ThemeContext';
+import EmptyState from './EmptyState';
+import Avatar from './Avatar';
+import IconButton from './IconButton';
+import { formatDate, timeAgo } from '../utils/helpers';
 
-const UserTable = ({ users, onEdit, onDelete }) => {
+const API_URL = 'https://new-crud-tau.vercel.app/api/users';
+
+function UserTable({
+  users,
+  totalCount,
+  searchQuery,
+  onEdit,
+  onDelete,
+  onRefresh,
+  onOpenCreate,
+  onClearSearch,
+}) {
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
   const fileInputRef = useRef(null);
@@ -14,7 +41,6 @@ const UserTable = ({ users, onEdit, onDelete }) => {
   const [showErrorDialog, setShowErrorDialog] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [errorData, setErrorData] = useState(null);
-  const { darkMode } = useTheme();
 
   const handleDeleteClick = (user) => {
     setUserToDelete(user);
@@ -44,7 +70,7 @@ const UserTable = ({ users, onEdit, onDelete }) => {
       formData.append('file', file);
 
       try {
-        const response = await fetch('https://new-crud-tau.vercel.app/api/users/import', {
+        const response = await fetch(`${API_URL}/import`, {
           method: 'POST',
           body: formData,
         });
@@ -60,8 +86,7 @@ const UserTable = ({ users, onEdit, onDelete }) => {
 
         setSuccessMessage(`Successfully imported ${result.count} users`);
         setShowSuccessDialog(true);
-        
-        window.location.reload();
+        onRefresh();
       } catch (error) {
         console.error('Error importing users:', error);
         setErrorMessage(error.message || 'Error importing users. Please check your JSON file format.');
@@ -80,53 +105,60 @@ const UserTable = ({ users, onEdit, onDelete }) => {
     }
   };
 
+  const handleDownload = () => {
+    const jsonData = JSON.stringify(users, null, 2);
+    const blob = new Blob([jsonData], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'users-data.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   if (!users.length) {
     return (
-      <div className="text-center py-12 dark:text-gray-200">
-        <svg className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-        </svg>
-        <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">No users found</h3>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Create a new user to get started.</p>
-        
-        <div className="mt-4">
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleImportJSON}
-            accept="application/json"
-            className="hidden"
-          />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={importing}
-            className="inline-flex items-center px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg border border-blue-200 hover:border-blue-300 transition-colors duration-200"
-          >
-            {importing ? (
-              <svg className="animate-spin h-5 w-5 mr-2" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-              </svg>
-            ) : (
-              <svg 
-                className="h-5 w-5 mr-2" 
-                fill="none" 
-                viewBox="0 0 24 24" 
-                stroke="currentColor"
+      <>
+        <EmptyState
+          icon={searchQuery ? MagnifyingGlassIcon : UsersIcon}
+          title={searchQuery ? 'No results found' : 'No users found'}
+          message={
+            searchQuery
+              ? `No users match "${searchQuery}". Try a different search term.`
+              : 'Create a new user to get started, or import existing users from a JSON file.'
+          }
+        >
+          {searchQuery ? (
+            <button type="button" onClick={onClearSearch} className="btn-secondary px-5 py-2.5 text-sm">
+              Clear search
+            </button>
+          ) : (
+            <>
+              <button type="button" onClick={onOpenCreate} className="btn-primary px-5 py-2.5 text-sm">
+                <UserPlusIcon className="h-4 w-4" />
+                Create User
+              </button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleImportJSON}
+                accept="application/json"
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={importing}
+                className="btn-secondary px-5 py-2.5 text-sm"
               >
-                <path 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  strokeWidth={2} 
-                  d="M4 16v-1a3 3 0 013-3h10a3 3 0 013 3v1m-4-8l-4-4m0 0L8 8m4-4v12"
-                />
-              </svg>
-            )}
-            <span className="font-medium">
-              {importing ? 'Importing...' : 'Import Users from JSON'}
-            </span>
-          </button>
-        </div>
+                <ArrowUpTrayIcon className="h-4 w-4" />
+                {importing ? 'Importing…' : 'Import JSON'}
+              </button>
+            </>
+          )}
+        </EmptyState>
 
         <SuccessDialog
           isOpen={showSuccessDialog}
@@ -137,239 +169,215 @@ const UserTable = ({ users, onEdit, onDelete }) => {
             setSuccessMessage('');
           }}
         />
-      </div>
+        <ErrorDialog
+          isOpen={showErrorDialog}
+          message={errorMessage}
+          errorData={errorData}
+          duration={10000}
+          onClose={() => {
+            setShowErrorDialog(false);
+            setErrorMessage('');
+            setErrorData(null);
+          }}
+        />
+      </>
     );
   }
 
+  const showAll = !searchQuery;
+
   return (
     <>
-      {users.length > 0 && (
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="flex items-center space-x-2 w-full lg:w-auto">
-            <div className="bg-indigo-100 dark:bg-indigo-900 rounded-full p-2">
-              <svg 
-                className="h-5 w-5 text-indigo-600 dark:text-indigo-300" 
-                fill="none" 
-                viewBox="0 0 24 24" 
-                stroke="currentColor"
-              >
-                <path 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  strokeWidth={2} 
-                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" 
-                />
-              </svg>
-            </div>
-            <div>
-              <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Entries</div>
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">{users.length}</div>
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto justify-center">
-            <button
-              onClick={() => {
-                const jsonData = JSON.stringify(users, null, 2);
-                const blob = new Blob([jsonData], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'users-data.json';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-              }}
-              className="flex items-center justify-center px-4 py-2 bg-green-50 dark:bg-green-900/30 hover:bg-green-100 dark:hover:bg-green-900/50 text-green-600 dark:text-green-400 rounded-lg border border-green-200 dark:border-green-800 hover:border-green-300 dark:hover:border-green-700 transition-colors duration-200 w-full sm:w-auto"
-            >
-              <svg 
-                className="h-5 w-5 mr-2" 
-                fill="none" 
-                viewBox="0 0 24 24" 
-                stroke="currentColor"
-              >
-                <path 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  strokeWidth={2} 
-                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                />
-              </svg>
-              <span className="font-medium">Download JSON</span>
-            </button>
-
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleImportJSON}
-              accept="application/json"
-              className="hidden"
-            />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={importing}
-              className="flex items-center justify-center px-4 py-2 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-600 dark:text-blue-400 rounded-lg border border-blue-200 dark:border-blue-800 hover:border-blue-300 dark:hover:border-blue-700 transition-colors duration-200 w-full sm:w-auto"
-            >
-              {importing ? (
-                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-              ) : (
-                <svg 
-                  className="h-5 w-5" 
-                  fill="none" 
-                  viewBox="0 0 24 24" 
-                  stroke="currentColor"
-                >
-                  <path 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round" 
-                    strokeWidth={2} 
-                    d="M4 16v-1a3 3 0 013-3h10a3 3 0 013 3v1m-4-8l-4-4m0 0L8 8m4-4v12"
-                  />
-                </svg>
+      <div className="card mb-4 flex flex-col gap-3 rounded-2xl p-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-center gap-3">
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 text-white shadow-glow">
+            <UsersIcon className="h-5 w-5" />
+          </span>
+          <div>
+            <p className="text-sm font-medium text-app-text-2">
+              {showAll ? 'Total Entries' : 'Search Results'}
+            </p>
+            <p className="text-xl font-extrabold tabular-nums text-app-text">
+              {users.length.toLocaleString()}
+              {!showAll && (
+                <span className="text-sm font-medium text-app-text-3">
+                  {' '}/ {totalCount.toLocaleString()} total
+                </span>
               )}
-              <span className="font-medium">
-                {importing ? 'Importing...' : 'Import JSON'}
-              </span>
-            </button>
+            </p>
           </div>
+        </div>
 
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImportJSON}
+            accept="application/json"
+            className="hidden"
+          />
           <button
-            onClick={() => window.location.reload()}
-            className="flex items-center justify-center px-4 py-2 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors duration-200 w-full lg:w-auto"
+            type="button"
+            onClick={onRefresh}
+            aria-label="Refresh data"
+            title="Refresh data"
+            className="btn-secondary px-3.5 py-2 text-xs sm:text-sm"
           >
-            <svg 
-              className="h-5 w-5 mr-2" 
-              fill="none" 
-              viewBox="0 0 24 24" 
-              stroke="currentColor"
-            >
-              <path 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                strokeWidth={2} 
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" 
-              />
-            </svg>
-            <span className="font-medium">Refresh</span>
+            <ArrowPathIcon className="h-4 w-4" />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleDownload}
+            aria-label="Download JSON"
+            title="Download JSON"
+            className="btn-secondary px-3.5 py-2 text-xs sm:text-sm"
+          >
+            <ArrowDownTrayIcon className="h-4 w-4" />
+            <span className="hidden sm:inline">Download JSON</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={importing}
+            aria-label={importing ? 'Importing…' : 'Import JSON'}
+            title={importing ? 'Importing…' : 'Import JSON'}
+            className="btn-secondary px-3.5 py-2 text-xs sm:text-sm"
+          >
+            <ArrowUpTrayIcon className={`h-4 w-4 ${importing ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">{importing ? 'Importing…' : 'Import JSON'}</span>
           </button>
         </div>
-      )}
+      </div>
 
-      <div className="overflow-x-auto shadow-md rounded-lg border border-gray-200 dark:border-gray-700">
-        <div className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <div className="hidden md:block">
-            <div className="bg-gray-50 dark:bg-gray-800">
-              <div className="grid grid-cols-4 divide-x divide-gray-200 dark:divide-gray-700">
-                <div className="px-6 py-4 text-center text-base font-bold text-gray-700 dark:text-gray-200">Name</div>
-                <div className="px-6 py-4 text-center text-base font-bold text-gray-700 dark:text-gray-200">Email</div>
-                <div className="px-6 py-4 text-center text-base font-bold text-gray-700 dark:text-gray-200">Mobile</div>
-                <div className="px-6 py-4 text-center text-base font-bold text-gray-700 dark:text-gray-200">Actions</div>
+      {/* Desktop table */}
+      <div className="table-glass hidden overflow-hidden rounded-2xl lg:block">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[820px] text-left text-sm">
+            <thead>
+              <tr className="border-b border-app-border bg-app-surface-2 text-xs uppercase tracking-wider text-app-text-3">
+                <th scope="col" className="px-5 py-4 font-semibold xl:px-6">User</th>
+                <th scope="col" className="px-5 py-4 font-semibold xl:px-6">Email</th>
+                <th scope="col" className="px-5 py-4 font-semibold xl:px-6">Mobile</th>
+                <th scope="col" className="px-5 py-4 font-semibold xl:px-6">Joined</th>
+                <th scope="col" className="px-5 py-4 text-right font-semibold xl:px-6">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-app-border-2">
+              {users.map((user, index) => (
+                <tr
+                  key={user._id}
+                  className="group animate-fade-in transition-colors duration-150 hover:bg-app-primary-softer"
+                  style={{ animationDelay: `${Math.min(index * 35, 350)}ms` }}
+                >
+                  <td className="px-5 py-4 xl:px-6">
+                    <div className="flex items-center gap-3">
+                      <Avatar name={user.name} size="sm" />
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold text-app-text">{user.name}</p>
+                        <p className="truncate text-xs text-app-text-3">
+                          ID · {String(user._id).slice(-8)}
+                        </p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-5 py-4 xl:px-6">
+                    <div className="flex items-center gap-2 text-app-text-2">
+                      <EnvelopeIcon className="h-4 w-4 shrink-0 text-app-text-3" />
+                      <span className="break-all">{user.email}</span>
+                    </div>
+                  </td>
+                  <td className="px-5 py-4 xl:px-6">
+                    <div className="flex items-center gap-2 text-app-text-2">
+                      <PhoneIcon className="h-4 w-4 shrink-0 text-app-text-3" />
+                      <span className="tabular-nums">{user.mobile}</span>
+                    </div>
+                  </td>
+                  <td className="px-5 py-4 xl:px-6">
+                    <div className="flex items-center gap-2 text-app-text-2">
+                      <CalendarDaysIcon className="h-4 w-4 shrink-0 text-app-text-3" />
+                      <div>
+                        <p>{formatDate(user.createdAt)}</p>
+                        <p className="text-xs text-app-text-3">{timeAgo(user.createdAt)}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-5 py-4 xl:px-6">
+                    <div className="flex items-center justify-end gap-2">
+                      <IconButton
+                        label={`Edit ${user.name}`}
+                        icon={PencilSolidIcon}
+                        onClick={() => onEdit(user)}
+                        size="sm"
+                      />
+                      <IconButton
+                        label={`Delete ${user.name}`}
+                        icon={TrashSolidIcon}
+                        onClick={() => handleDeleteClick(user)}
+                        size="sm"
+                        tone="danger"
+                      />
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Mobile / tablet cards */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:hidden">
+        {users.map((user, index) => (
+          <article
+            key={user._id}
+            className="card animate-fade-in rounded-2xl p-4 transition-colors duration-150 hover:bg-app-surface-2"
+            style={{ animationDelay: `${Math.min(index * 35, 350)}ms` }}
+          >
+            <div className="flex items-start gap-3">
+              <Avatar name={user.name} size="md" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-bold text-app-text">{user.name}</p>
+                <p className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-app-text-3">
+                  <CalendarDaysIcon className="h-3.5 w-3.5 shrink-0" />
+                  Joined {formatDate(user.createdAt)} · {timeAgo(user.createdAt)}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-1.5">
+                <IconButton
+                  label={`Edit ${user.name}`}
+                  icon={PencilSolidIcon}
+                  onClick={() => onEdit(user)}
+                  size="sm"
+                />
+                <IconButton
+                  label={`Delete ${user.name}`}
+                  icon={TrashSolidIcon}
+                  onClick={() => handleDeleteClick(user)}
+                  size="sm"
+                  tone="danger"
+                />
               </div>
             </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-            {users.map((user, index) => (
-              <div 
-                key={user._id}
-                className={`${index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-900'}`}
-              >
-                <div className="block md:hidden p-4">
-                  <div className="flex flex-col space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="font-medium text-gray-500 dark:text-gray-400">Name:</span>
-                      <span className="text-gray-900 dark:text-gray-100">{user.name}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="font-medium text-gray-500 dark:text-gray-400">Email:</span>
-                      <span className="text-gray-900 dark:text-gray-100">{user.email}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="font-medium text-gray-500 dark:text-gray-400">Mobile:</span>
-                      <span className="text-gray-900 dark:text-gray-100">{user.mobile}</span>
-                    </div>
-                    <div className="flex justify-end space-x-2 mt-2">
-                      <button
-                        onClick={() => onEdit(user)}
-                        className="inline-flex items-center px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-white rounded-md border border-indigo-200 dark:border-indigo-800 text-sm"
-                      >
-                        <svg className="h-4 w-4 mr-1" /* ... svg props ... */ />
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDeleteClick(user)}
-                        className="inline-flex items-center px-3 py-1.5 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-white rounded-md border border-red-200 dark:border-red-800 text-sm"
-                      >
-                        <svg className="h-4 w-4 mr-1" /* ... svg props ... */ />
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="hidden md:grid md:grid-cols-4 md:divide-x md:divide-gray-200 dark:divide-gray-700">
-                  <div className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-semibold text-gray-900 dark:text-gray-100 text-center">
-                      {user.name}
-                    </div>
-                  </div>
-                  <div className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-semibold text-gray-900 dark:text-gray-100 text-center">
-                      {user.email}
-                    </div>
-                  </div>
-                  <div className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-semibold text-gray-900 dark:text-gray-100 text-center">
-                      {user.mobile}
-                    </div>
-                  </div>
-                  <div className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex justify-center items-center space-x-4">
-                      <button
-                        onClick={() => onEdit(user)}
-                        className="inline-flex items-center px-4 py-2 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-600 dark:text-white hover:text-indigo-900 dark:hover:text-white rounded-md border border-indigo-200 dark:border-indigo-800 hover:border-indigo-300 dark:hover:border-indigo-700 shadow-sm"
-                      >
-                        <svg 
-                          xmlns="http://www.w3.org/2000/svg" 
-                          className="h-4 w-4 mr-2" 
-                          viewBox="0 0 20 20" 
-                          fill="currentColor"
-                        >
-                          <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                        </svg>
-                        <span className="font-semibold">Edit</span>
-                      </button>
-                      <button
-                        onClick={() => handleDeleteClick(user)}
-                        className="inline-flex items-center px-4 py-2 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 text-red-600 dark:text-white hover:text-red-900 dark:hover:text-white rounded-md border border-red-200 dark:border-red-800 hover:border-red-300 dark:hover:border-red-700 shadow-sm"
-                      >
-                        <svg 
-                          xmlns="http://www.w3.org/2000/svg" 
-                          className="h-4 w-4 mr-2" 
-                          viewBox="0 0 20 20" 
-                          fill="currentColor"
-                        >
-                          <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                        </svg>
-                        <span className="font-semibold">Delete</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
+            <div className="mt-3 space-y-2 border-t border-app-border-2 pt-3">
+              <div className="flex items-center gap-2 text-sm text-app-text-2">
+                <EnvelopeIcon className="h-4 w-4 shrink-0 text-app-text-3" />
+                <span className="min-w-0 break-all">{user.email}</span>
               </div>
-            ))}
-          </div>
-        </div>
+              <div className="flex items-center gap-2 text-sm text-app-text-2">
+                <PhoneIcon className="h-4 w-4 shrink-0 text-app-text-3" />
+                <span className="tabular-nums">{user.mobile}</span>
+              </div>
+            </div>
+          </article>
+        ))}
       </div>
 
       <ConfirmationDialog
         isOpen={showDeleteConfirmation}
         title="Confirm Delete"
         message={`Are you sure you want to delete ${userToDelete?.name}? This action cannot be undone.`}
+        confirmText="Delete"
         onConfirm={handleDeleteConfirm}
         onCancel={() => {
           setShowDeleteConfirmation(false);
@@ -400,6 +408,17 @@ const UserTable = ({ users, onEdit, onDelete }) => {
       />
     </>
   );
+}
+
+UserTable.propTypes = {
+  users: PropTypes.array.isRequired,
+  totalCount: PropTypes.number,
+  searchQuery: PropTypes.string,
+  onEdit: PropTypes.func.isRequired,
+  onDelete: PropTypes.func.isRequired,
+  onRefresh: PropTypes.func.isRequired,
+  onOpenCreate: PropTypes.func.isRequired,
+  onClearSearch: PropTypes.func.isRequired,
 };
 
-export default UserTable; 
+export default UserTable;
